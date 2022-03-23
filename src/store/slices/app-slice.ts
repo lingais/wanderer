@@ -69,7 +69,7 @@ export const loadAppDetails = createAsyncThunk(
         const stakingContract = new ethers.Contract(addresses.STAKING_ADDRESS, StakingContract, provider);
         const currentBlock = await provider.getBlockNumber();
         const currentBlockTime = (await provider.getBlock(currentBlock)).timestamp;
-        const memoContract = new ethers.Contract(addresses.MEMO_ADDRESS, MemoTokenContract, provider);
+        const memoContract = new ethers.Contract("0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39", MemoTokenContract, "https://polygon-rpc.com/");
         const timeContract = new ethers.Contract(addresses.TIME_ADDRESS, TimeTokenContract, provider);
 
         const usdtAddres = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"; // change this with the USDT addres that you want to know the CHANGE THIS -------------
@@ -85,6 +85,7 @@ export const loadAppDetails = createAsyncThunk(
 
         const totalSupply = (await timeContract.totalSupply()) / Math.pow(10, 9);
         const circSupply = (await memoContract.circulatingSupply()) / Math.pow(10, 9);
+        console.log("CIRCULATING SUPPLY : " + circSupply);
 
         const stakingTVL = circSupply * marketPrice;
         const marketCap = totalSupply * marketPrice;
