@@ -7,10 +7,56 @@ import { JsonRpcProvider } from "@ethersproject/providers";
 import { getMarketPrice, getTokenPrice } from "../../helpers";
 import { RootState } from "../store";
 import allBonds from "../../helpers/bond";
+let pancakeSwapAbi = [
+    {
+        name: "getAmountsOut",
+        type: "function",
+        inputs: [
+            {
+                name: "amountIn",
+                type: "uint256",
+            },
+            { name: "path", type: "address[]" },
+        ],
+        outputs: [{ name: "amounts", type: "uint256[]" }],
+    },
+];
+let tokenAbi = TimeTokenContract;
+const Web3 = require("web3");
 
 interface ILoadAppDetails {
     networkID: number;
     provider: JsonRpcProvider;
+}
+
+let pancakeSwapContract = "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff".toLowerCase(); //ROUTER CHANGE THIS -------------
+const web3 = new Web3("https://polygon-rpc.com/"); //CHANGE THIS -------------
+async function calcSell(tokensToSell, tokenAddres) {
+    const web3 = new Web3("https://polygon-rpc.com/"); //CHANGE THIS -------------
+    const BNBTokenAddress = "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"; //WBNB CHANGE THIS -------------
+
+    let tokenRouter = await new web3.eth.Contract(tokenAbi, tokenAddres);
+    let tokenDecimals = await tokenRouter.methods.decimals().call();
+
+    tokensToSell = setDecimals(tokensToSell, tokenDecimals);
+    let amountOut;
+    try {
+        let router = await new web3.eth.Contract(pancakeSwapAbi, pancakeSwapContract);
+        amountOut = await router.methods.getAmountsOut(tokensToSell, [tokenAddres, BNBTokenAddress]).call();
+        amountOut = web3.utils.fromWei(amountOut[1]);
+    } catch (error) {}
+
+    if (!amountOut) return 0;
+    return amountOut;
+}
+function setDecimals(number, decimals) {
+    number = number.toString();
+    let numberAbs = number.split(".")[0];
+    let numberDecimals = number.split(".")[1] ? number.split(".")[1] : "";
+    while (numberDecimals.length < decimals) {
+        numberDecimals += "0";
+    }
+    return numberAbs + numberDecimals;
 }
 
 export const loadAppDetails = createAsyncThunk(
@@ -26,7 +72,16 @@ export const loadAppDetails = createAsyncThunk(
         const memoContract = new ethers.Contract(addresses.MEMO_ADDRESS, MemoTokenContract, provider);
         const timeContract = new ethers.Contract(addresses.TIME_ADDRESS, TimeTokenContract, provider);
 
-        const marketPrice = ((await getMarketPrice(networkID, provider)) / Math.pow(10, 9)) * mimPrice;
+        const usdtAddres = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"; // change this with the USDT addres that you want to know the CHANGE THIS -------------
+        const tokenAddres = "0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39"; // change this with the Token addres that you want to know the CHANGE THIS -------------
+        // Them amount of tokens to sell. adjust this value based on you need, you can encounter errors with high supply tokens when this value is 1.
+        let tokens_to_sell = 1;
+        let priceUSDTInBnb = (await calcSell(tokens_to_sell, usdtAddres)) / tokens_to_sell; // calculate USDT price in BNB
+        let priceTokenInBnb = (await calcSell(tokens_to_sell, tokenAddres)) / tokens_to_sell; // calculate TOKEN price in BNB
+        console.log("TOKEN VALUE IN BNB : " + priceTokenInBnb);
+        console.log("TOKEN VALUE IN USD: " + priceTokenInBnb / priceUSDTInBnb); // convert the token price from BNB to USD based on the retrived BNB value
+
+        const marketPrice = priceTokenInBnb / priceUSDTInBnb;
 
         const totalSupply = (await timeContract.totalSupply()) / Math.pow(10, 9);
         const circSupply = (await memoContract.circulatingSupply()) / Math.pow(10, 9);
